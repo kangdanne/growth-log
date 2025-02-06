@@ -1177,15 +1177,20 @@ public class CPlayRoomUI : CSingletonMonobehaviour<CPlayRoomUI>, IMessageReceive
 			
 			Input.gyro.enabled = true;
 
+			Vector3 previousGyro = Vector3.zero; // 이전 프레임의 자이로 값
+			bool isShaken = false;
+
 			if (player_index == this.player_me_index)
 			{
 				// 카드가 내려놓아지는 조건
-				while (true)
+				while (true && !isShaken)
 				{
-					Vector3 gyroRotation = Input.gyro.rotationRateUnbiased;
+					 Vector3 gyroRotation = Input.gyro.rotationRateUnbiased;
+        			 Vector3 gyroDelta = gyroRotation - previousGyro; // 가속도 변화량 계산
 
-					// 특정 기울기 조건을 만족하면 루프 종료
-					if (Mathf.Abs(gyroRotation.x) > 2.0f || Mathf.Abs(gyroRotation.y) > 2.0f)
+					// 📌 강하게 흔들었을 때만 반응 (기울기 변화 8.0 이상 + 순간 가속도 변화 8.0 이상)
+        			if ((Mathf.Abs(gyroRotation.x) > 8.0f || Mathf.Abs(gyroRotation.y) > 8.0f) &&
+            			(Mathf.Abs(gyroDelta.x) > 5.0f || Mathf.Abs(gyroDelta.y) > 5.0f))
 					{
 						Debug.Log("Card drop detected based on gyro input.");
 						// 0.5초 후에 1초 동안 진동 실행
@@ -1194,8 +1199,12 @@ public class CPlayRoomUI : CSingletonMonobehaviour<CPlayRoomUI>, IMessageReceive
 
 						Handheld.Vibrate();
 
-						break;
-					}
+						isShaken = true;
+						// 📌 카드 제출 후 다시 강한 흔들림이 필요하도록 초기화
+            			yield return new WaitForSeconds(0.5f); // 대기 후 다시 감지
+            			previousGyro = Vector3.zero; // 이전 값 초기화 (다시 강한 흔들림 필요)
+						//break;
+					} 
 
 					yield return null;
 				}
@@ -1216,40 +1225,40 @@ public class CPlayRoomUI : CSingletonMonobehaviour<CPlayRoomUI>, IMessageReceive
 	
 	// 카드 스케일 확대 후 화면 가운데 배치
 	IEnumerator scale_and_move_to_center(CCardPicture card_picture, float ratio, float duration)
-{
-    card_picture.sprite_renderer.sortingOrder = CSpriteLayerOrderManager.Instance.Order;
+	{
+    	card_picture.sprite_renderer.sortingOrder = CSpriteLayerOrderManager.Instance.Order;
 
-    Vector3 fromPos = card_picture.transform.position; // 원래 위치
-    Vector3 fromScale = card_picture.transform.localScale; // 원래 크기
+    	Vector3 fromPos = card_picture.transform.position; // 원래 위치
+    	Vector3 fromScale = card_picture.transform.localScale; // 원래 크기
 
-    // 📌 UI Canvas의 중심 좌표 구하기
-    RectTransform canvasRect = FindObjectOfType<Canvas>().GetComponent<RectTransform>();
-    Vector3 screenCenter = new Vector3(Screen.width / 2, Screen.height / 2, 0);
+    	// 📌 UI Canvas의 중심 좌표 구하기
+    	RectTransform canvasRect = FindObjectOfType<Canvas>().GetComponent<RectTransform>();
+    	Vector3 screenCenter = new Vector3(Screen.width / 2, Screen.height / 2, 0);
     
-    // 📌 World 좌표로 변환 (카드가 UI 위에서 정렬되는 경우)
-    Vector3 toPos;
-    RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRect, screenCenter, Camera.main, out toPos);
+    	// 📌 World 좌표로 변환 (카드가 UI 위에서 정렬되는 경우)
+    	Vector3 toPos;
+    	RectTransformUtility.ScreenPointToWorldPointInRectangle(canvasRect, screenCenter, Camera.main, out toPos);
 
-    Vector3 toScale = fromScale * ratio;
+    	Vector3 toScale = fromScale * ratio;
 
-    float begin = Time.time;
-    while (Time.time - begin <= duration)
-    {
-        float t = (Time.time - begin) / duration;
+    	float begin = Time.time;
+    	while (Time.time - begin <= duration)
+    	{
+        	float t = (Time.time - begin) / duration;
 
-        // 위치 변경 (World Position)
-        card_picture.transform.position = Vector3.Lerp(fromPos, toPos, t);
+        	// 위치 변경 (World Position)
+        	card_picture.transform.position = Vector3.Lerp(fromPos, toPos, t);
 
-        // 스케일 변경
-        card_picture.transform.localScale = Vector3.Lerp(fromScale, toScale, t);
+        	// 스케일 변경
+        	card_picture.transform.localScale = Vector3.Lerp(fromScale, toScale, t);
 
-        yield return null;
-    }
+        	yield return null;
+    	}
 
-    // 최종 위치 & 스케일 설정
-    card_picture.transform.position = toPos;
-    card_picture.transform.localScale = toScale;
-}
+    	// 최종 위치 & 스케일 설정
+    	card_picture.transform.position = toPos;
+    	card_picture.transform.localScale = toScale;
+	}
 
 	
 	// 카드 스케일 확대 
